@@ -1,52 +1,230 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { BookOpen, Check, ChevronLeft, ChevronRight, Menu, RotateCcw, Settings2, X } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { ChevronRight, Check } from 'lucide-react'
 
-const cards = [
-  { title: 'The Contract', type: 'Concept', prompt: 'What contract must a valid binary search tree satisfy?', answer: 'For every node, every value in the left subtree is strictly less than the node, and every value in the right subtree is strictly greater. The rule must hold recursively for every subtree, not just immediate children.', code: null },
-  { title: 'The Leap of Faith', type: 'Mental model', prompt: 'When validating a subtree recursively, what can the current call assume?', answer: 'Each recursive call can assume its own subtree is valid. The current call only needs to check the current node against its allowed bounds, then pass tighter bounds to its children.', code: null },
-  { title: 'Bound Shrinkage', type: 'Invariant', prompt: 'How do valid bounds change as you move through the tree?', answer: 'The left child inherits the upper bound of the current node. The right child inherits the lower bound. Each step narrows the interval of values that can appear below it.', code: 'validate(node.left, low, node.val)\nvalidate(node.right, node.val, high)' },
-  { title: 'Recursive Code Skeleton', type: 'Implementation', prompt: 'Complete the recursive skeleton for validating a BST.', answer: 'Use an open interval and reject values outside it. A null node is valid because an empty subtree satisfies the contract.', code: 'function isValid(node, low = -Infinity, high = Infinity) {\n  if (node === null) return true\n  if (node.val <= low || node.val >= high) return false\n  return isValid(node.left, low, node.val) &&\n    isValid(node.right, node.val, high)\n}' },
+// Real Q&A from knowledge base
+const allCards = [
+  { id: 1, topic: 'BST Validation', q: 'What contract must a valid binary search tree satisfy?', a: 'For every node, every value in the left subtree is strictly less than the node, and every value in the right subtree is strictly greater. The rule must hold recursively for every subtree.' },
+  { id: 2, topic: 'BST Validation', q: 'When validating a subtree recursively, what can the current call assume?', a: 'Each recursive call can assume its own subtree is valid. The current call only needs to check the current node against its allowed bounds, then pass tighter bounds to its children.' },
+  { id: 3, topic: 'BST Validation', q: 'How do valid bounds change as you move through the tree?', a: 'The left child inherits the upper bound of the current node. The right child inherits the lower bound. Each step narrows the interval of values that can appear below it.' },
+  { id: 4, topic: 'BST Validation', q: 'Complete the recursive skeleton for validating a BST.', a: 'Use an open interval and reject values outside it. A null node is valid because an empty subtree satisfies the contract.\n\nfunction isValid(node, low = -Infinity, high = Infinity) {\n  if (node === null) return true\n  if (node.val <= low || node.val >= high) return false\n  return isValid(node.left, low, node.val) &&\n    isValid(node.right, node.val, high)\n}' },
+  { id: 5, topic: 'Algorithms', q: 'What is the time complexity of binary search?', a: 'O(log n) because with each iteration, the search space is halved. Even for 1 billion elements, you need at most 30 comparisons.' },
+  { id: 6, topic: 'Data Structures', q: 'What is the difference between a stack and a queue?', a: 'A stack is LIFO (Last In, First Out), while a queue is FIFO (First In, First Out). Stacks use push/pop; queues use enqueue/dequeue.' },
+  { id: 7, topic: 'Algorithms', q: 'Explain quicksort\'s partition algorithm.', a: 'Pick a pivot element and partition the array into elements smaller than the pivot and elements larger than it. Recursively sort both partitions. Average case: O(n log n).' },
+  { id: 8, topic: 'Data Structures', q: 'When should you use a hash table over a sorted array?', a: 'Use a hash table for O(1) average lookup, insertion, and deletion. Use a sorted array when you need range queries or sorted iteration, or when you need to minimize memory overhead.' },
+  { id: 9, topic: 'Algorithms', q: 'What does it mean for an algorithm to be in-place?', a: 'An algorithm is in-place if it sorts or rearranges data using O(1) or O(log n) extra space, modifying the input array directly without requiring a copy.' },
+  { id: 10, topic: 'Data Structures', q: 'What is the purpose of a linked list node\'s next pointer?', a: 'The next pointer maintains the sequential connection between nodes. It allows traversal from one node to the next without requiring contiguous memory, enabling efficient insertion and deletion.' },
 ]
 
-const decks = ['Deck 1 — Validate BST', 'Core Algorithms & DS', 'Java Core', 'Aug-26 additions']
+const decks = [
+  { id: 1, name: 'BST Validation', count: 4, desc: 'Recursive tree validation patterns and bound shrinkage' },
+  { id: 2, name: 'Core Algorithms', count: 28, desc: 'Sorting, searching, and fundamental algorithmic patterns' },
+  { id: 3, name: 'Data Structures', count: 42, desc: 'Arrays, linked lists, trees, graphs, and heaps' },
+  { id: 4, name: 'System Design', count: 15, desc: 'Scalability, caching, load balancing, databases' },
+]
+
+type ViewState = 'landing' | 'test' | 'score' | 'email' | 'decks'
 
 export default function Page() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [deck, setDeck] = useState(decks[0])
-  const [index, setIndex] = useState(0)
+  const [view, setView] = useState<ViewState>('landing')
+  const [testIndex, setTestIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
-  const [ratings, setRatings] = useState<Record<number, string>>({})
-  const card = cards[index]
-  const reviewed = Object.keys(ratings).length
-  const progress = useMemo(() => Math.round((reviewed / cards.length) * 100), [reviewed])
+  const [testCards] = useState(() => allCards.slice(0, 10))
+  const [scores, setScores] = useState<Record<number, boolean>>({})
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
 
-  function rate(value: string) { setRatings((r) => ({ ...r, [index]: value })); setRevealed(false); setIndex((i) => (i + 1) % cards.length) }
-  function chooseDeck(value: string) { setDeck(value); setIndex(0); setRevealed(false) }
+  const testCard = testCards[testIndex]
+  const score = Object.values(scores).filter(Boolean).length
+  const scorePercent = Math.round((score / testCards.length) * 100)
 
-  return <main className="min-h-screen bg-background text-foreground">
-    <div className="mx-auto flex min-h-screen max-w-[1440px]">
-      <aside className={`fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r border-border bg-sidebar p-5 transition-transform lg:static lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground"><BookOpen size={15} /></div><span className="font-mono text-sm font-bold tracking-tight">forge</span></div><button onClick={() => setMobileOpen(false)} className="rounded-md p-2 text-muted-foreground hover:bg-accent lg:hidden" aria-label="Close menu"><X size={16} /></button></div>
-        <p className="mt-12 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Library</p>
-        <nav className="mt-3 flex flex-col gap-1" aria-label="Library navigation"><button className="rounded-md bg-accent px-3 py-2.5 text-left text-sm font-semibold text-foreground">Flashcards</button><button className="rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Decks</button><button className="rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Progress</button></nav>
-        <div className="mt-auto flex items-center gap-3 border-t border-border pt-4"><div className="grid size-8 place-items-center rounded-full bg-secondary font-mono text-[10px] font-bold">AK</div><div><p className="text-xs font-semibold">Alex Kim</p><p className="text-[11px] text-muted-foreground">Candidate</p></div><Settings2 size={15} className="ml-auto text-muted-foreground" /></div>
-      </aside>
-      {mobileOpen && <button className="fixed inset-0 z-20 bg-foreground/20 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" />}
-      <section className="min-w-0 flex-1">
-        <header className="flex h-16 items-center justify-between border-b border-border px-4 sm:px-8"><div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-md p-2 hover:bg-accent lg:hidden" aria-label="Open menu"><Menu size={19} /></button><span className="text-sm text-muted-foreground">Library <span className="px-2 text-border">/</span> <span className="text-foreground">Flashcards</span></span></div><div className="font-mono text-xs text-muted-foreground">751 Q&A pairs</div></header>
-        <div className="mx-auto max-w-5xl px-4 py-7 sm:px-8 sm:py-10">
-          <div className="flex flex-col justify-between gap-5 border-b border-border pb-7 sm:flex-row sm:items-end"><div><p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary">Study workspace</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Flashcards</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Review the ideas behind the implementation. Recall first, then reveal the explanation.</p></div><label className="flex flex-col gap-2 text-xs font-semibold text-muted-foreground">Deck<select value={deck} onChange={(e) => chooseDeck(e.target.value)} className="rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring">{decks.map((d) => <option key={d}>{d}</option>)}</select></label></div>
-          <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
-            <section><div className="mb-3 flex items-center justify-between text-xs text-muted-foreground"><span>{index + 1} of {cards.length} cards</span><span>{progress}% reviewed</span></div><div className="h-1 overflow-hidden rounded-full bg-secondary"><div className="h-full bg-primary transition-all" style={{ width: `${Math.max(progress, 4)}%` }} /></div>
-              <article className="mt-6 min-h-[390px] rounded-lg border border-border bg-card p-6 sm:p-10"><div className="flex items-center justify-between"><span className="rounded border border-border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{card.type}</span><span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, '0')}</span></div><h2 className="mt-12 text-2xl font-bold tracking-tight sm:text-3xl">{card.title}</h2><p className="mt-5 max-w-2xl text-lg leading-8 text-foreground">{revealed ? card.answer : card.prompt}</p>{revealed && card.code && <pre className="mt-7 overflow-x-auto rounded-md bg-secondary p-4 font-mono text-xs leading-6 text-secondary-foreground"><code>{card.code}</code></pre>}<div className="mt-10 flex flex-wrap items-center gap-3"><button onClick={() => setRevealed(!revealed)} className="rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90">{revealed ? 'Hide answer' : 'Reveal answer'}</button>{revealed && <div className="flex flex-wrap gap-2"><button onClick={() => rate('Again')} className="rounded-md border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Again</button><button onClick={() => rate('Good')} className="rounded-md border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Good</button><button onClick={() => rate('Easy')} className="rounded-md border border-border px-3 py-2 text-xs font-semibold hover:bg-accent">Easy</button></div>}</div></article>
-              <div className="mt-4 flex items-center justify-between"><button onClick={() => { setIndex((i) => (i - 1 + cards.length) % cards.length); setRevealed(false) }} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"><ChevronLeft size={16} /> Previous</button><button onClick={() => { setIndex((i) => (i + 1) % cards.length); setRevealed(false) }} className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground">Next <ChevronRight size={16} /></button></div></section>
-            <aside className="flex flex-col gap-4"><div className="rounded-lg border border-border bg-card p-5"><p className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Knowledge base</p><p className="mt-4 font-mono text-2xl font-bold">52</p><p className="mt-1 text-xs text-muted-foreground">study decks</p><div className="my-4 h-px bg-border" /><div className="flex justify-between text-xs"><span className="text-muted-foreground">Cards in library</span><span className="font-semibold">274</span></div><div className="mt-3 flex justify-between text-xs"><span className="text-muted-foreground">Reviewed here</span><span className="font-semibold">{reviewed}</span></div></div><div className="rounded-lg border border-border p-5"><p className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current deck</p><p className="mt-3 text-sm font-semibold leading-5">{deck}</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Core Algorithms & DS · 7 cards in this sequence</p><button onClick={() => { setRatings({}); setIndex(0); setRevealed(false) }} className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"><RotateCcw size={13} /> Reset session</button></div></aside>
+  function startTest() {
+    setScores({})
+    setTestIndex(0)
+    setRevealed(false)
+    setView('test')
+  }
+
+  function grade(correct: boolean) {
+    setScores(prev => ({ ...prev, [testIndex]: correct }))
+    if (testIndex < testCards.length - 1) {
+      setTestIndex(testIndex + 1)
+      setRevealed(false)
+    } else {
+      setView('score')
+    }
+  }
+
+  function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setEmailError('')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email')
+      return
+    }
+    setView('decks')
+  }
+
+  // Landing
+  if (view === 'landing') {
+    return (
+      <div className="min-h-screen bg-white text-gray-900">
+        <header className="border-b border-gray-200">
+          <div className="mx-auto max-w-2xl px-6 py-8 sm:px-8">
+            <h1 className="text-xl font-bold tracking-tight">Forge</h1>
+            <p className="mt-1 text-sm text-gray-600">Technical interview flashcards. Test yourself.</p>
           </div>
-          <div className="mt-12 grid gap-4 border-t border-border pt-6 text-xs text-muted-foreground sm:grid-cols-3"><div><p className="font-semibold text-foreground">Core Algorithms & DS</p><p className="mt-1">Foundations and patterns</p></div><div><p className="font-semibold text-foreground">Java Core</p><p className="mt-1">Language and runtime concepts</p></div><div><p className="font-semibold text-foreground">Aug-26 additions</p><p className="mt-1">Recently added cards</p></div></div>
+        </header>
+        <main className="mx-auto max-w-2xl px-6 py-12 sm:px-8 sm:py-16">
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Take the interview test</h2>
+              <p className="mt-4 max-w-lg text-base leading-7 text-gray-700">
+                Ten quick questions on core algorithms and data structures. Reveal answers and grade yourself. No signup yet—just test your knowledge.
+              </p>
+            </section>
+            <button
+              onClick={startTest}
+              className="inline-flex items-center gap-2 rounded-lg bg-black px-6 py-3 font-semibold text-white hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+            >
+              Start test <ChevronRight size={18} />
+            </button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Test
+  if (view === 'test') {
+    return (
+      <div className="min-h-screen bg-white text-gray-900">
+        <header className="border-b border-gray-200">
+          <div className="mx-auto max-w-2xl px-6 py-6 sm:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm text-gray-600">{testIndex + 1} / {testCards.length}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900">{testCard.topic}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-2xl font-bold">{Object.keys(scores).length}</p>
+                <p className="text-xs text-gray-600">answered</p>
+              </div>
+            </div>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-gray-200">
+              <div className="h-full bg-black transition-all" style={{ width: `${((testIndex + 1) / testCards.length) * 100}%` }} />
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto max-w-2xl px-6 py-8 sm:px-8">
+          <article className="rounded-lg border border-gray-200 bg-gray-50 p-6 sm:p-8">
+            <p className="font-mono text-xs text-gray-600 uppercase tracking-wide">Question</p>
+            <h2 className="mt-4 text-2xl font-bold leading-tight">{testCard.q}</h2>
+            {revealed && (
+              <div className="mt-6 space-y-3">
+                <p className="text-base leading-7 text-gray-800">{testCard.a}</p>
+              </div>
+            )}
+            <div className="mt-8 flex flex-wrap gap-3">
+              {!revealed ? (
+                <button
+                  onClick={() => setRevealed(true)}
+                  className="rounded-lg bg-black px-4 py-2.5 font-semibold text-white hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                >
+                  Reveal answer
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => grade(false)}
+                    className="rounded-lg border border-gray-300 px-4 py-2.5 font-semibold text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                  >
+                    Got it wrong
+                  </button>
+                  <button
+                    onClick={() => grade(true)}
+                    className="rounded-lg bg-black px-4 py-2.5 font-semibold text-white hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                  >
+                    Got it right
+                  </button>
+                </>
+              )}
+            </div>
+          </article>
+        </main>
+      </div>
+    )
+  }
+
+  // Score
+  if (view === 'score') {
+    return (
+      <div className="min-h-screen bg-white text-gray-900 flex items-center">
+        <div className="w-full px-6 py-12 sm:px-8">
+          <div className="mx-auto max-w-2xl space-y-8 text-center">
+            <div>
+              <p className="font-mono text-xs text-gray-600 uppercase tracking-wide">Your score</p>
+              <p className="mt-4 text-6xl font-bold sm:text-7xl">{scorePercent}%</p>
+              <p className="mt-2 text-lg text-gray-700">{score} out of {testCards.length} correct</p>
+            </div>
+            <p className="text-base leading-7 text-gray-700">
+              Enter your email to unlock all flashcard decks and continue practicing.
+            </p>
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailError('') }}
+                  placeholder="your.email@example.com"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 font-mono text-sm placeholder-gray-500 focus:border-black focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+                />
+                {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
+              </div>
+              <button
+                type="submit"
+                className="w-full rounded-lg bg-black px-4 py-3 font-semibold text-white hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+              >
+                Unlock decks
+              </button>
+            </form>
+          </div>
         </div>
-      </section>
-    </div>
-  </main>
+      </div>
+    )
+  }
+
+  // Decks
+  if (view === 'decks') {
+    return (
+      <div className="min-h-screen bg-white text-gray-900">
+        <header className="border-b border-gray-200">
+          <div className="mx-auto max-w-4xl px-6 py-8 sm:px-8">
+            <p className="font-mono text-xs text-gray-600 uppercase tracking-wide">Welcome, {email}</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Available decks</h1>
+            <p className="mt-2 text-base text-gray-700">Start with any deck. Track your progress across all of them.</p>
+          </div>
+        </header>
+        <main className="mx-auto max-w-4xl px-6 py-8 sm:px-8">
+          <div className="grid gap-6 sm:grid-cols-2">
+            {decks.map(deck => (
+              <div key={deck.id} className="rounded-lg border border-gray-200 p-6 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-lg">{deck.name}</h3>
+                    <p className="mt-1 text-sm text-gray-600">{deck.desc}</p>
+                  </div>
+                  <div className="shrink-0 rounded-full bg-black text-white w-8 h-8 flex items-center justify-center font-mono text-sm font-bold">
+                    {deck.count}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    )
+  }
 }
